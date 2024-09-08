@@ -32,33 +32,26 @@
     <h1>未来城校区猫咪喂食记录</h1>
     
     <h2>使用说明</h2>
-    <p>由于大家遇到猫咪的时间不同，都不知道猫今天有没有被喂，所以往往过度投喂导致浪费，如果你平常每天都投喂，某天看不到它可能担心它饿到了，其实它可能吃饱下班了。</p>
+    <p>本网站用于记录未来城校区猫咪的喂食情况，避免过度投喂，你可以通过下面的「测试用」的投喂按钮进行投喂测试。</p>
+    <p>如果你今天投喂了某只猫咪，请你在这个网站上找到对应的猫咪，然后点击“投喂”按钮，这样大家就知道这只猫今天被喂了多少次，从而判断是继续投喂还是陪伴。</p>
+    <p>本网站的猫咪编号来自于<a href="https://docs.qq.com/sheet/DWXVLaUVPb1ZNdmlr?tab=fliaid">这个表格</a>，里面有猫咪的照片，未来我也会想办法把猫咪照片放到网站上来。</p>
 
-    <p>为了尝试解决这个问题，当你喂了猫后，请你在你喂的这只猫下面点击一下"喂了"，其余人就知道了。下面专门放了"测试用"的按钮，你可以先点一下这个试试看。</p>
-
-    <p>为了避免某个人误点击导致反复投喂，无限增加投喂次数，这个网站通过 IP 来判断是否为独立投喂人，你的 IP 不会用做他途，如果你用的是 CUG，有可能会投喂失败。</p>
+    <p>为了避免某个人误点击导致反复投喂，无限增加投喂次数，这个网站通过 IP 来判断是否为独立投喂人，你的 IP 不会用做他途，如果你用的是 CUG 的 Wi-Fi，有可能会告诉你已经投喂过了，建议切换喂手机流量后再试。</p>
+    <p>如果它吃饱了还没下班，你看看它，陪它玩玩，也挺好。</p>
         
     <p id="userIp">您的IP地址：加载中...</p>
     
     <h2>今日喂食情况</h2>
-    <table id="catTable">
-        <tr>
-            <th>编号</th>
-            <th>名字</th>
-            <th>今日投喂次数</th>
-            <th>投喂？</th>
-        </tr>
-    </table>
+    <div id="catTable"></div>
     
     <h2>其他信息</h2>
-    <p>这个网站还在逐渐完善，补充猫咪的信息，你可以联系微信：cugcats</p>
-    <p>由于这个网站还在不断完善，所以不排除未来会不定时的无法访问，或者数据丢失，它未来会越来越稳定的。</p>
+    <p>如果需要补充猫咪的信息，你可以联系微信：cugcats</p>
+    <p>由于这个网站还在不断完善，所以不排除未来会不定时的无法访问，或者数据丢失，不用担心，它未来会越来越稳定的。</p>
     <p>项目已开源，点击<a href="https://github.com/CugCats/cugcats">这里</a>查看</p>
-    <p>更多关于校内猫咪的信息，可以查看<a href="https://docs.qq.com/sheet/DWXVLaUVPb1ZNdmlr?tab=fliaid">这个表格</a>,以后我会把猫的名字根据这个表格内容同步上。</p>
 
     <h2>没有猫粮？</h2>
-    <p>如果你愿意花些时间照顾一下学校里的猫，可以去猫基地拿小袋装的猫粮，我会尽可能及时补充，如果没了，也可以提醒我补充一下。</p>
-    <p>就我个人来说，我非常不希望你花钱去买猫粮，因为你可能还没有收入来源。如果你还是想花钱，去买《被讨厌的勇气》和《非暴力沟通（华夏出版社版本）》，看十遍，就好了。</p>
+    <p>果你愿意花些时间照顾一下学校里的猫，可以去猫基地拿小袋装的猫粮，我会尽可能及时补充，如果没了，也可以提醒我补充一下。</p>
+    <p>就我个人来说，我非常不希望你花去买猫粮，因为你可能还没有收入来源。如果你还是想花钱，去买《被讨厌的勇气》和《非暴力沟通（华夏出版社版本）》，看十遍，就好了。</p>
 
     <h2>利益声明</h2>
     <p>本人不会在这个网站上获取任何经济收益，反而会付出比较多的成本，比如猫粮，比如每个月的捐款，因为我有收入可以覆盖这部分成本，所以我不用获利，我在乎的是能做一件有意义的事情，并且，我有了一个作品。</p>
@@ -90,25 +83,68 @@
 
         const catTable = document.getElementById("catTable");
 
+        function sortAreas(a, b) {
+            return a.area_weight - b.area_weight;
+        }
+
         async function updateTable() {
             const cats = await getCats();
             
-            // 清除现有的猫咪行
-            while (catTable.rows.length > 1) {
-                catTable.deleteRow(1);
-            }
+            // 按区域分组
+            const catsByArea = cats.reduce((acc, cat) => {
+                if (!acc[cat.area_name]) {
+                    acc[cat.area_name] = { cats: [], weight: cat.area_weight };
+                }
+                acc[cat.area_name].cats.push(cat);
+                return acc;
+            }, {});
 
-            // 添加猫咪数据
-            cats.forEach(cat => {
-                const row = catTable.insertRow();
-                row.insertCell(0).textContent = cat.cat_id;
-                row.insertCell(1).textContent = cat.name;
-                row.insertCell(2).textContent = cat.count;
-                const feedButton = document.createElement("button");
-                feedButton.textContent = "投喂";
-                feedButton.onclick = () => toggleFed(cat.cat_id);
-                row.insertCell(3).appendChild(feedButton);
-            });
+            // 清除现有的表格内容
+            catTable.innerHTML = '';
+
+            // 对区域进行排序
+            const sortedAreas = Object.entries(catsByArea)
+                .sort((a, b) => a[1].weight - b[1].weight)
+                .map(([areaName, areaData]) => ({ name: areaName, cats: areaData.cats }));
+
+            // 为每个区域创建一个表格
+            for (const area of sortedAreas) {
+                const areaHeader = document.createElement('h3');
+                areaHeader.textContent = area.name;
+                catTable.appendChild(areaHeader);
+
+                const table = document.createElement('table');
+                table.innerHTML = `
+                    <tr>
+                        <th>编号</th>
+                        <th>名字</th>
+                        <th>具体位置</th>
+                        <th>今日投喂次数</th>
+                        <th>今日陪伴次数</th>
+                        <th>投喂？</th>
+                        <th>陪伴？</th>
+                    </tr>
+                `;
+
+                area.cats.forEach(cat => {
+                    const row = table.insertRow();
+                    row.insertCell(0).textContent = cat.cat_id;
+                    row.insertCell(1).textContent = cat.name;
+                    row.insertCell(2).textContent = cat.specific_location;
+                    row.insertCell(3).textContent = cat.count;
+                    row.insertCell(4).textContent = cat.companion_count;
+                    const feedButton = document.createElement("button");
+                    feedButton.textContent = "投喂";
+                    feedButton.onclick = () => toggleFed(cat.cat_id);
+                    row.insertCell(5).appendChild(feedButton);
+                    const companionButton = document.createElement("button");
+                    companionButton.textContent = "陪伴";
+                    companionButton.onclick = () => toggleCompanion(cat.cat_id);
+                    row.insertCell(6).appendChild(companionButton);
+                });
+
+                catTable.appendChild(table);
+            }
         }
 
         async function toggleFed(catId) {
@@ -121,7 +157,17 @@
             }
         }
 
-        // 初始化表格和获取用户IP
+        async function toggleCompanion(catId) {
+            const response = await fetch(`${API_URL}/companion/${catId}`, { method: 'POST' });
+            const result = await response.json();
+            if (result.success) {
+                await updateTable();
+            } else {
+                alert('您今天已经陪伴过这只猫了');
+            }
+        }
+
+        // 初始化表格获取用户IP
         updateTable();
         getUserIp();
     </script>
