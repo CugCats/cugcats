@@ -101,7 +101,7 @@ function initializeCats() {
     { cat_id: 'CAT053', name: '大白', area: '宿舍区', specific_location: '二组团' },
     { cat_id: 'CAT054', name: '糖爹', area: '宿舍区', specific_location: '一组团' },
     { cat_id: 'CAT060', name: '蛋仔', area: '宿舍区', specific_location: '一组团' },
-    { cat_id: 'CAT062', name: '假贴��', area: '宿舍区', specific_location: '二组团&驿站' },
+    { cat_id: 'CAT062', name: '假贴贴', area: '宿舍区', specific_location: '二组团&驿站' },
     { cat_id: 'CAT063', name: '喇叭', area: '其它区域', specific_location: '图书馆' },
     { cat_id: 'CAT070', name: '线面', area: '其它区域', specific_location: '图书馆' },
     { cat_id: 'CAT071', name: '花卷', area: '各学院', specific_location: '环院' },
