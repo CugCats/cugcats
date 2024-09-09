@@ -260,7 +260,7 @@ function restoreDailyCounts() {
 // 在服务启动时调用恢复函数
 restoreDailyCounts();
 
-// API 端点: 获取所有猫咪数
+// API 端点: 获取所有猫咪数��
 app.get('/cats', (req, res) => {
   db.all(`
     SELECT c.*, a.name as area_name, a.weight as area_weight
