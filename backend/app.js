@@ -77,6 +77,15 @@ db.run(`CREATE TABLE IF NOT EXISTS daily_companions (
   UNIQUE(cat_id, companion_date)
 )`);
 
+// 创建历史记录表
+db.run(`CREATE TABLE IF NOT EXISTS feeding_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cat_id TEXT,
+  feed_date DATE,
+  feed_count INTEGER,
+  companion_count INTEGER
+)`);
+
 // 初始化区域数据
 function initializeAreas() {
   const areas = [
@@ -137,13 +146,14 @@ function initializeCats() {
     { cat_id: 'CAT089', name: '窄窄', area: '各学', specific_location: '环院&四组团' },
     { cat_id: 'CAT090', name: '海口跟班小橘', area: '宿舍区', specific_location: '二组团' },
     { cat_id: 'CAT091', name: '凶凶跟班小橘', area: '宿舍区', specific_location: '四组团' },
-    { cat_id: 'CAT092', name: '丑橘', area: '宿舍区', specific_location: '可能是四组团？' },
+    { cat_id: 'CAT092', name: '丑橘', area: '宿舍区', specific_location: '四组团' },
+    { cat_id: 'CAT093', name: '半白半菊', area: '宿舍区', specific_location: '四组团' },
+    { cat_id: 'CAT094', name: '雪里拖枪', area: '宿舍区', specific_location: '未知' },
     
     // ... 其他猫咪数据 ...
   ];
 
-  db.run('DELETE FROM cats');
-  const stmt = db.prepare('INSERT OR REPLACE INTO cats (cat_id, name, area_id, specific_location, count) VALUES (?, ?, (SELECT id FROM areas WHERE name = ?), ?, 0)');
+  const stmt = db.prepare('INSERT OR IGNORE INTO cats (cat_id, name, area_id, specific_location, count, companion_count) VALUES (?, ?, (SELECT id FROM areas WHERE name = ?), ?, 0, 0)');
   cats.forEach(cat => {
     stmt.run(cat.cat_id, cat.name, cat.area, cat.specific_location, (err) => {
       if (err) {
@@ -204,6 +214,14 @@ function createTables() {
       companion_date DATE,
       count INTEGER,
       UNIQUE(cat_id, companion_date)
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS feeding_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cat_id TEXT,
+      feed_date DATE,
+      feed_count INTEGER,
+      companion_count INTEGER
     )`);
   });
 }
@@ -307,13 +325,10 @@ function resetDailyCounts() {
   const today = new Date().toISOString().split('T')[0];
   const yesterday = new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split('T')[0];
 
-  // 将昨天的数据存入历史记录表（如果需要的话）
-  db.run('INSERT INTO feeding_history SELECT * FROM daily_feedings WHERE feed_date = ?', [yesterday]);
-  db.run('INSERT INTO companion_history SELECT * FROM daily_companions WHERE companion_date = ?', [yesterday]);
-
-  // 删除昨天及更早的数据
-  db.run('DELETE FROM daily_feedings WHERE feed_date < ?', [today]);
-  db.run('DELETE FROM daily_companions WHERE companion_date < ?', [today]);
+  // 将昨天的数据存入历史记录表
+  db.run(`INSERT INTO feeding_history (cat_id, feed_date, feed_count, companion_count)
+          SELECT cat_id, ?, count, companion_count
+          FROM cats`, [yesterday]);
 
   // 重置cats表中的计数
   db.run('UPDATE cats SET count = 0, companion_count = 0', (err) => {
@@ -400,5 +415,17 @@ app.post('/companion/:cat_id', (req, res) => {
         });
       });
     });
+  });
+});
+
+// 新增路由: 获取历史数据
+app.get('/history/:cat_id', (req, res) => {
+  const { cat_id } = req.params;
+  db.all('SELECT * FROM feeding_history WHERE cat_id = ? ORDER BY feed_date DESC', [cat_id], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json(rows);
   });
 });
