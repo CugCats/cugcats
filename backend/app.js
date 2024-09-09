@@ -59,6 +59,24 @@ db.run(`CREATE TABLE IF NOT EXISTS feedings (
   UNIQUE(cat_id, user_ip, fed_date)
 )`);
 
+// 创建用户陪伴记录表
+db.run(`CREATE TABLE IF NOT EXISTS companions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cat_id TEXT,
+  user_ip TEXT,
+  companion_date DATE,
+  UNIQUE(cat_id, user_ip, companion_date)
+)`);
+
+// 创建每日陪伴记录表
+db.run(`CREATE TABLE IF NOT EXISTS daily_companions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cat_id TEXT,
+  companion_date DATE,
+  count INTEGER,
+  UNIQUE(cat_id, companion_date)
+)`);
+
 // 初始化区域数据
 function initializeAreas() {
   const areas = [
@@ -115,7 +133,7 @@ function initializeCats() {
     { cat_id: 'CAT085', name: '黄鼠狼', area: '其它区域', specific_location: '图书馆' },
     { cat_id: 'CAT087', name: '麻雀', area: '宿舍区', specific_location: '二组团' },
     { cat_id: 'CAT088', name: '宽宽', area: '各学院', specific_location: '环院' },
-    { cat_id: 'CAT089', name: '窄窄', area: '各学��', specific_location: '环院&四组团' },
+    { cat_id: 'CAT089', name: '窄窄', area: '各学', specific_location: '环院&四组团' },
     { cat_id: 'CAT090', name: '海口跟班小橘', area: '宿舍区', specific_location: '二组团' },
     { cat_id: 'CAT091', name: '凶凶跟班小橘', area: '宿舍区', specific_location: '四组团' },
     { cat_id: 'CAT092', name: '丑橘', area: '宿舍区', specific_location: '可能是四组团？' },
@@ -164,6 +182,22 @@ function createTables() {
       user_ip TEXT,
       fed_date DATE,
       UNIQUE(cat_id, user_ip, fed_date)
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS companions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cat_id TEXT,
+      user_ip TEXT,
+      companion_date DATE,
+      UNIQUE(cat_id, user_ip, companion_date)
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS daily_companions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cat_id TEXT,
+      companion_date DATE,
+      count INTEGER,
+      UNIQUE(cat_id, companion_date)
     )`);
   });
 }
@@ -252,7 +286,7 @@ app.post('/feed/:cat_id', (req, res) => {
 // 每日重置喂食计数的函数
 function resetDailyCounts() {
   const today = new Date().toISOString().split('T')[0];
-  db.run('UPDATE cats SET count = 0', (err) => {
+  db.run('UPDATE cats SET count = 0, companion_count = 0', (err) => {
     if (err) {
       console.error('Error resetting daily counts:', err);
     } else {
@@ -264,6 +298,20 @@ function resetDailyCounts() {
       console.error('Error clearing old daily feedings:', err);
     } else {
       console.log('Old daily feedings cleared successfully');
+    }
+  });
+  db.run('DELETE FROM daily_companions WHERE companion_date < ?', [today], (err) => {
+    if (err) {
+      console.error('Error clearing old daily companions:', err);
+    } else {
+      console.log('Old daily companions cleared successfully');
+    }
+  });
+  db.run('DELETE FROM companions WHERE companion_date < ?', [today], (err) => {
+    if (err) {
+      console.error('Error clearing old companions:', err);
+    } else {
+      console.log('Old companions cleared successfully');
     }
   });
 }
@@ -306,7 +354,7 @@ app.post('/companion/:cat_id', (req, res) => {
   const userIp = getClientIp(req);
   const today = new Date().toISOString().split('T')[0];
 
-  db.get('SELECT * FROM feedings WHERE cat_id = ? AND user_ip = ? AND fed_date = ?', [cat_id, userIp, today], (err, row) => {
+  db.get('SELECT * FROM companions WHERE cat_id = ? AND user_ip = ? AND companion_date = ?', [cat_id, userIp, today], (err, row) => {
     if (err) {
       res.status(500).json({ success: false, message: err.message });
       return;
@@ -317,12 +365,27 @@ app.post('/companion/:cat_id', (req, res) => {
       return;
     }
 
-    db.run('UPDATE cats SET companion_count = companion_count + 1 WHERE cat_id = ?', [cat_id], (err) => {
+    db.run('INSERT INTO companions (cat_id, user_ip, companion_date) VALUES (?, ?, ?)', [cat_id, userIp, today], (err) => {
       if (err) {
         res.status(500).json({ success: false, message: err.message });
         return;
       }
-      res.json({ success: true });
+
+      db.run('UPDATE cats SET companion_count = companion_count + 1 WHERE cat_id = ?', [cat_id], (err) => {
+        if (err) {
+          res.status(500).json({ success: false, message: err.message });
+          return;
+        }
+
+        db.run('INSERT OR REPLACE INTO daily_companions (cat_id, companion_date, count) VALUES (?, ?, COALESCE((SELECT count FROM daily_companions WHERE cat_id = ? AND companion_date = ?), 0) + 1)', 
+          [cat_id, today, cat_id, today], (err) => {
+          if (err) {
+            res.status(500).json({ success: false, message: err.message });
+            return;
+          }
+          res.json({ success: true });
+        });
+      });
     });
   });
 });
