@@ -33,7 +33,7 @@
     
     <h2>使用说明</h2>
     <p>这个网站旨在记录未来城校区猫咪的喂食情况，帮助避免猫咪被过度投喂 🐾。你可以通过下方的"测试用"按钮进行喂食功能的测试 🐱🍲。</p>
-    <p>如果你今天已经喂过某只猫咪，请在网站上找到相应的猫咪并点击"投喂"按钮 🐾。这样其他人就可以看到这只猫咪今天被喂了多少次，从而决定是否继续喂食或陪伴它 🐾💬。</p>
+    <p>如果你今天已经喂过某只猫咪，请在网站上找到相应的猫咪并点击"投喂"按钮 🐾。这样其他人就���以看到这只猫咪今天被喂了多少次，从而决定是否继续喂食或陪伴它 🐾💬。</p>
     <p>本网站的猫咪编号来自于<a href="https://docs.qq.com/sheet/DWXVLaUVPb1ZNdmlr?tab=fliaid">这个表格</a>，里面附有猫咪的照片 📸。未来，我会努力将这些照片直接显示在网站上，方便大家查阅 🖼️。</p>
 
     <p>为了防止误操作导致猫咪被反复投喂 🐾，网站会根据访问者的 IP 地址来判断是否为独立的喂食行为。你的 IP 只用于此目的，不会被用作其他用途 🔒。如果你使用的是 CUG 的校园 Wi-Fi 📶，可能会提示你已经喂过猫咪。此时建议切换到手机流量后再试 📱。</p>
@@ -63,7 +63,7 @@
         // 添加这个函数来获取用户IP
         async function getUserIp() {
             try {
-                const response = await fetch('https://api.ipify.org?format=json');
+                const response = await fetch(`${API_URL}/user-ip`);
                 const data = await response.json();
                 document.getElementById('userIp').textContent = `您的IP地址：${data.ip}`;
             } catch (error) {
@@ -73,8 +73,15 @@
         }
 
         async function getCats() {
-            const response = await fetch(`${API_URL}/cats`);
-            return await response.json();
+            try {
+                const response = await fetch(`${API_URL}/cats`);
+                const data = await response.json();
+                console.log('Fetched cats:', data);
+                return data;
+            } catch (error) {
+                console.error('Error fetching cats:', error);
+                return [];
+            }
         }
 
         async function feedCat(catId) {
@@ -147,13 +154,78 @@
             }
         }
 
+        const feedMessages = [
+            "小猫咪吃得饱饱的了，真是多亏了你的爱心！🐱❤️",
+            "谢谢你喂猫，它一定感受到了你的关怀！🙏🐾",
+            "猫咪幸福地吃着食物，它会记住你的善良。😻🍽️",
+            "你的一份心意，让猫咪今天多了一份美味！🥰🐈",
+            "猫咪已经开心地享用了你的美食，感谢你！🍲😊",
+            "感谢你的投喂，小猫咪现在心满意足了！😺💖",
+            "你的一点点关爱，猫咪收到了，它很开心！🐾🥳",
+            "今天的猫咪特别幸福，谢谢你的喂食！🎉🐱",
+            "你喂的猫咪吃得非常开心，感谢你对它的关照。🍖🥰",
+            "猫咪肚子圆滚滚的，它特别感激你的投喂！🐈🍗",
+            "谢谢你让猫咪今天吃到了好吃的，它一定很开心。😻🍲",
+            "你让猫咪的世界又温暖了一些，谢谢你的喂食！🌞🐾",
+            "猫咪已经满足地吃饱了，它感激你。😺🙏",
+            "你的一份投喂让猫咪多了一份欢快，感谢你！🎈🐾",
+            "感谢你的一份食物，猫咪吃得心满意足。🍽️😺",
+            "猫咪吃得津津有味，它一定非常喜欢你的投喂。🐱🍖",
+            "谢谢你，让猫咪今天也吃得很好。😊🐾",
+            "猫咪感受到了你的关爱，今天特别满足。❤️🐈",
+            "猫咪吃得好开心，谢谢你的关心！🎉😻",
+            "你让猫咪的肚子暖暖的，它一定很感激你！🐾🍲",
+            "猫咪在享用你送的美味，它会记住你的好。🐱😇",
+            "感谢你为猫咪准备的食物，它现在正在幸福地吃着呢！🍽️😺",
+            "你的一份投喂让猫咪更加健康快乐，谢谢！🐾🍗",
+            "猫咪已经吃饱了，感谢你对它的爱心投喂！😻🙏",
+            "谢谢你让猫咪拥有了一顿丰盛的晚餐！🍽️😊",
+            "你的一份小小食物，让猫咪的世界更温暖了！🐾❤️",
+            "猫咪非常享受你的投喂，感谢你对它的帮助！🍲😺",
+            "你让猫咪今天吃得特别满足，谢谢！🎉🐈",
+            "小猫咪已经吃饱了，它现在肯定很开心，感谢你！😊🍖",
+            "猫咪已经吃得心满意足，它会偷偷感激你哦！🐾😻"
+        ];
+
+        const companionMessages = [
+            "猫咪感受到了你的陪伴，今天一定很开心！🐱💖",
+            "谢谢你抽时间陪伴猫咪，它一定非常满足。🐾😊",
+            "小猫咪得到了你的陪伴，它感受到了温暖。😻🌞",
+            "感谢你给猫咪带来的陪伴，它会记住你的好。🐱💝",
+            "你的陪伴让猫咪今天更安心了，谢谢你。🐾🙏",
+            "猫咪陪在你身边，它一定感到非常幸福。🐈🥰",
+            "你的一份陪伴让猫咪的世界更加温暖，感谢你！🐾❤️",
+            "谢谢你抽空陪猫咪，它一定感受到了你的关爱。🐱🙏",
+            "猫咪今天因为你的陪伴变得更开心了，谢谢！🐾😺",
+            "你的陪伴让猫咪不再孤单，真是太感谢了！🐱🌟",
+            "小猫咪今天得到了你的陪伴，它一定很快乐。😻💖",
+            "谢谢你温暖的陪伴，猫咪今天感受到了满满的爱。🐾😊",
+            "猫咪今天有了你的陪伴，它心里暖暖的。🐈❤️",
+            "感谢你花时间陪伴猫咪，它今天特别满足。🐱🙏",
+            "你让猫咪今天不再孤单，它一定感激你！🐾🎉",
+            "谢谢你的陪伴，猫咪今天特别开心。🐱😊",
+            "猫咪的生活因为你的陪伴变得更加美好，感谢你！🐾💖",
+            "你的陪伴让猫咪感受到了温暖，它今天很满足。😻🌟",
+            "小猫咪有了你在身边，一定感到非常幸福，谢谢你！🐈😊",
+            "猫咪今天和你度过了愉快的时光，它一定很开心。🐱🎉",
+            "你让猫咪的日子不再孤独，真是太感谢了！🐾❤️",
+        ];
+
+        function showRandomMessage(messages) {
+            const randomIndex = Math.floor(Math.random() * messages.length);
+            alert(messages[randomIndex]);
+        }
+
         async function toggleFed(catId) {
             const response = await fetch(`${API_URL}/feed/${catId}`, { method: 'POST' });
             const result = await response.json();
             if (result.success) {
+                if (result.firstTime) {
+                    showRandomMessage(feedMessages);
+                }
                 await updateTable();
             } else {
-                alert('您今天已经投喂过这只猫了');
+                alert('猫咪今天已经吃得很饱了哦，感谢你的关心！🐱🍽️');
             }
         }
 
@@ -161,9 +233,12 @@
             const response = await fetch(`${API_URL}/companion/${catId}`, { method: 'POST' });
             const result = await response.json();
             if (result.success) {
+                if (result.firstTime) {
+                    showRandomMessage(companionMessages);
+                }
                 await updateTable();
             } else {
-                alert('您今天已经陪伴过这只猫了');
+                alert('猫咪今天已经得到了你的陪伴，它很开心哦！😻💖');
             }
         }
 

@@ -260,7 +260,7 @@ function restoreDailyCounts() {
 // 在服务启动时调用恢复函数
 restoreDailyCounts();
 
-// API 端点: 获取所有猫咪数据
+// API 端点: 获取所有猫咪数
 app.get('/cats', (req, res) => {
   db.all(`
     SELECT c.*, a.name as area_name, a.weight as area_weight
@@ -313,7 +313,7 @@ app.post('/feed/:cat_id', (req, res) => {
             res.status(500).json({ success: false, message: err.message });
             return;
           }
-          res.json({ success: true });
+          res.json({ success: true, firstTime: true });
         });
       });
     });
@@ -411,7 +411,7 @@ app.post('/companion/:cat_id', (req, res) => {
             res.status(500).json({ success: false, message: err.message });
             return;
           }
-          res.json({ success: true });
+          res.json({ success: true, firstTime: true });
         });
       });
     });
