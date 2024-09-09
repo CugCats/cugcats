@@ -119,7 +119,7 @@ function initializeCats() {
     { cat_id: 'CAT053', name: '大白', area: '宿舍区', specific_location: '二组团' },
     { cat_id: 'CAT054', name: '糖爹', area: '宿舍区', specific_location: '一组团' },
     { cat_id: 'CAT060', name: '蛋仔', area: '宿舍区', specific_location: '一组团' },
-    { cat_id: 'CAT062', name: '假贴贴', area: '宿舍区', specific_location: '二组团&驿站' },
+    { cat_id: 'CAT062', name: '假贴贴', area: '宿舍区', specific_location: '二组团&驿��' },
     { cat_id: 'CAT063', name: '喇叭', area: '其它区域', specific_location: '图书馆' },
     { cat_id: 'CAT070', name: '线面', area: '其它区域', specific_location: '图书馆' },
     { cat_id: 'CAT071', name: '花卷', area: '各学院', specific_location: '环院' },
@@ -207,23 +207,34 @@ createTables();
 initializeAreas();
 initializeCats();
 
-// 恢复当天的投喂数据
-function restoreDailyFeedings() {
+// 恢复当天的投喂和陪伴数据
+function restoreDailyCounts() {
   const today = new Date().toISOString().split('T')[0];
-  db.all('SELECT cat_id, count FROM daily_feedings WHERE feed_date = ?', [today], (err, rows) => {
+  db.all('SELECT cat_id, count FROM daily_feedings WHERE feed_date = ?', [today], (err, feedingRows) => {
     if (err) {
       console.error('Error restoring daily feedings:', err);
       return;
     }
-    rows.forEach(row => {
+    feedingRows.forEach(row => {
       db.run('UPDATE cats SET count = ? WHERE cat_id = ?', [row.count, row.cat_id]);
     });
     console.log('Daily feedings restored');
   });
+
+  db.all('SELECT cat_id, count FROM daily_companions WHERE companion_date = ?', [today], (err, companionRows) => {
+    if (err) {
+      console.error('Error restoring daily companions:', err);
+      return;
+    }
+    companionRows.forEach(row => {
+      db.run('UPDATE cats SET companion_count = ? WHERE cat_id = ?', [row.count, row.cat_id]);
+    });
+    console.log('Daily companions restored');
+  });
 }
 
 // 在服务启动时调用恢复函数
-restoreDailyFeedings();
+restoreDailyCounts();
 
 // API 端点: 获取所有猫咪数据
 app.get('/cats', (req, res) => {
@@ -283,9 +294,20 @@ app.post('/feed/:cat_id', (req, res) => {
   });
 });
 
-// 每日重置喂食计数的函数
+// 每日重置喂食和陪伴计数的函数
 function resetDailyCounts() {
   const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split('T')[0];
+
+  // 将昨天的数据存入历史记录表（如果需要的话）
+  db.run('INSERT INTO feeding_history SELECT * FROM daily_feedings WHERE feed_date = ?', [yesterday]);
+  db.run('INSERT INTO companion_history SELECT * FROM daily_companions WHERE companion_date = ?', [yesterday]);
+
+  // 删除昨天及更早的数据
+  db.run('DELETE FROM daily_feedings WHERE feed_date < ?', [today]);
+  db.run('DELETE FROM daily_companions WHERE companion_date < ?', [today]);
+
+  // 重置cats表中的计数
   db.run('UPDATE cats SET count = 0, companion_count = 0', (err) => {
     if (err) {
       console.error('Error resetting daily counts:', err);
@@ -293,27 +315,10 @@ function resetDailyCounts() {
       console.log('Daily counts reset successfully');
     }
   });
-  db.run('DELETE FROM daily_feedings WHERE feed_date < ?', [today], (err) => {
-    if (err) {
-      console.error('Error clearing old daily feedings:', err);
-    } else {
-      console.log('Old daily feedings cleared successfully');
-    }
-  });
-  db.run('DELETE FROM daily_companions WHERE companion_date < ?', [today], (err) => {
-    if (err) {
-      console.error('Error clearing old daily companions:', err);
-    } else {
-      console.log('Old daily companions cleared successfully');
-    }
-  });
-  db.run('DELETE FROM companions WHERE companion_date < ?', [today], (err) => {
-    if (err) {
-      console.error('Error clearing old companions:', err);
-    } else {
-      console.log('Old companions cleared successfully');
-    }
-  });
+
+  // 清理旧的用户记录
+  db.run('DELETE FROM feedings WHERE fed_date < ?', [today]);
+  db.run('DELETE FROM companions WHERE companion_date < ?', [today]);
 }
 
 // 设置每日午夜重置
