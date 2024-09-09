@@ -98,8 +98,8 @@ function initializeAreas() {
 // 初始化猫咪数据
 function initializeCats() {
   const cats = [
-    { cat_id: 'CAT000', name: '测试用', area: '测试用', specific_location: 'CUG全境' },
-    { cat_id: 'CAT999', name: '测试2', area: '测试用', specific_location: 'CUG全境' },
+    { cat_id: 'CAT000', name: '用来测试', area: '测试用', specific_location: 'CUG校内' },
+    { cat_id: 'CAT999', name: '测试用', area: '测试用', specific_location: 'CUG全境' },
     { cat_id: 'CAT005', name: '海胆', area: '各学院', specific_location: '环院&池塘附近' },
     { cat_id: 'CAT007', name: '花臂', area: '宿舍区', specific_location: '一组团' },
     { cat_id: 'CAT008', name: '圆圆', area: '各学院', specific_location: '环院' },
@@ -143,16 +143,21 @@ function initializeCats() {
   ];
 
   db.run('DELETE FROM cats');
-  const stmt = db.prepare(`
-    INSERT OR REPLACE INTO cats (cat_id, name, area_id, specific_location, count)
-    VALUES (?, ?, (SELECT id FROM areas WHERE name = ?), ?, 0)
-  `);
+  const stmt = db.prepare('INSERT OR REPLACE INTO cats (cat_id, name, area_id, specific_location, count) VALUES (?, ?, (SELECT id FROM areas WHERE name = ?), ?, 0)');
   cats.forEach(cat => {
-    stmt.run(cat.cat_id, cat.name, cat.area, cat.specific_location);
+    stmt.run(cat.cat_id, cat.name, cat.area, cat.specific_location, (err) => {
+      if (err) {
+        console.error(`Error inserting cat ${cat.cat_id}:`, err);
+      }
+    });
   });
-  stmt.finalize();
-
-  console.log('猫咪数据初始化完成');
+  stmt.finalize((err) => {
+    if (err) {
+      console.error('Error finalizing statement:', err);
+    } else {
+      console.log('猫咪数据初始化完成');
+    }
+  });
 }
 
 // 在初始化猫咪数据之前调用
@@ -246,9 +251,11 @@ app.get('/cats', (req, res) => {
     ORDER BY a.weight, c.cat_id
   `, (err, rows) => {
     if (err) {
+      console.error('Error fetching cats:', err);
       res.status(500).json({ error: err.message });
       return;
     }
+    console.log('Fetched cats:', rows);
     res.json(rows);
   });
 });
