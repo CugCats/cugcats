@@ -113,37 +113,29 @@ function initializeCats() {
   const cats = require('./cats_data');
 
   db.serialize(() => {
-    // 先删除所有现有的猫咪数据
-    db.run('DELETE FROM cats', (err) => {
+    // 准备插入或更新的语句
+    const stmt = db.prepare(`
+      INSERT OR REPLACE INTO cats (cat_id, name, area_id, specific_location, count, companion_count) 
+      VALUES (?, ?, (SELECT id FROM areas WHERE name = ?), ?, 
+        COALESCE((SELECT count FROM cats WHERE cat_id = ?), 0), 
+        COALESCE((SELECT companion_count FROM cats WHERE cat_id = ?), 0)
+      )
+    `);
+
+    cats.forEach(cat => {
+      stmt.run(cat.cat_id, cat.name, cat.area, cat.specific_location, cat.cat_id, cat.cat_id, (err) => {
+        if (err) {
+          console.error(`Error inserting or updating cat ${cat.cat_id}:`, err);
+        }
+      });
+    });
+
+    stmt.finalize((err) => {
       if (err) {
-        console.error('Error deleting existing cats:', err);
-        return;
+        console.error('Error finalizing statement:', err);
+      } else {
+        console.log('猫咪数据初始化完成');
       }
-      console.log('Existing cats data deleted');
-
-      // 重置自增ID
-      db.run('DELETE FROM sqlite_sequence WHERE name="cats"', (err) => {
-        if (err) {
-          console.error('Error resetting auto-increment:', err);
-        }
-      });
-
-      // 插入新的猫咪数据
-      const stmt = db.prepare('INSERT INTO cats (cat_id, name, area_id, specific_location, count, companion_count) VALUES (?, ?, (SELECT id FROM areas WHERE name = ?), ?, 0, 0)');
-      cats.forEach(cat => {
-        stmt.run(cat.cat_id, cat.name, cat.area, cat.specific_location, (err) => {
-          if (err) {
-            console.error(`Error inserting cat ${cat.cat_id}:`, err);
-          }
-        });
-      });
-      stmt.finalize((err) => {
-        if (err) {
-          console.error('Error finalizing statement:', err);
-        } else {
-          console.log('猫咪数据初始化完成');
-        }
-      });
     });
   });
 }
@@ -161,7 +153,6 @@ function createTables() {
       companion_count INTEGER DEFAULT 0,
       FOREIGN KEY (area_id) REFERENCES areas(id)
     )`);
-
     db.run(`CREATE TABLE IF NOT EXISTS daily_feedings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       cat_id TEXT,
@@ -169,7 +160,6 @@ function createTables() {
       count INTEGER,
       UNIQUE(cat_id, feed_date)
     )`);
-
     db.run(`CREATE TABLE IF NOT EXISTS feedings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       cat_id TEXT,
@@ -177,7 +167,6 @@ function createTables() {
       fed_date DATE,
       UNIQUE(cat_id, user_ip, fed_date)
     )`);
-
     db.run(`CREATE TABLE IF NOT EXISTS companions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       cat_id TEXT,
@@ -185,7 +174,6 @@ function createTables() {
       companion_date DATE,
       UNIQUE(cat_id, user_ip, companion_date)
     )`);
-
     db.run(`CREATE TABLE IF NOT EXISTS daily_companions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       cat_id TEXT,
@@ -193,7 +181,6 @@ function createTables() {
       count INTEGER,
       UNIQUE(cat_id, companion_date)
     )`);
-
     db.run(`CREATE TABLE IF NOT EXISTS feeding_history (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       cat_id TEXT,
@@ -208,14 +195,12 @@ function createTables() {
 const fs = require('fs');
 const dbPath = path.join(__dirname, '../database/cats.db');
 
-if (!fs.existsSync(dbPath)) {
-  console.log('数据库不存在，正在初始化...');
-  createTables();
-  initializeAreas();
-  initializeCats();
-} else {
-  console.log('数据库已存在，跳过初始化步骤');
-}
+console.log('正在检查数据库结构...');
+createTables();
+initializeAreas();
+initializeCats();
+
+console.log('数据库结构检查完成');
 
 // 更新猫咪信息
 updateCatsInfo();
@@ -245,26 +230,35 @@ function updateCatsInfo() {
 // 恢复当天的投喂和陪伴数据
 function restoreDailyCounts() {
   const today = new Date().toISOString().split('T')[0];
-  db.all('SELECT cat_id, count FROM daily_feedings WHERE feed_date = ?', [today], (err, feedingRows) => {
-    if (err) {
-      console.error('Error restoring daily feedings:', err);
-      return;
-    }
-    feedingRows.forEach(row => {
-      db.run('UPDATE cats SET count = ? WHERE cat_id = ?', [row.count, row.cat_id]);
-    });
-    console.log('Daily feedings restored');
-  });
+  
+  const tables = ['daily_feedings', 'daily_companions', 'daily_misses'];
+  const updates = {
+    'daily_feedings': 'UPDATE cats SET count = ? WHERE cat_id = ?',
+    'daily_companions': 'UPDATE cats SET companion_count = ? WHERE cat_id = ?',
+    'daily_misses': 'UPDATE cats SET miss_count = ? WHERE cat_id = ?'
+  };
+  const dateColumns = {
+    'daily_feedings': 'feed_date',
+    'daily_companions': 'companion_date',
+    'daily_misses': 'miss_date'
+  };
 
-  db.all('SELECT cat_id, count FROM daily_companions WHERE companion_date = ?', [today], (err, companionRows) => {
-    if (err) {
-      console.error('Error restoring daily companions:', err);
-      return;
-    }
-    companionRows.forEach(row => {
-      db.run('UPDATE cats SET companion_count = ? WHERE cat_id = ?', [row.count, row.cat_id]);
+  tables.forEach(table => {
+    const dateColumn = dateColumns[table];
+    db.all(`SELECT cat_id, count FROM ${table} WHERE ${dateColumn} = ?`, [today], (err, rows) => {
+      if (err) {
+        if (err.code === 'SQLITE_ERROR' && err.message.includes('no such table')) {
+          console.log(`表 ${table} 不存在，跳过恢复`);
+        } else {
+          console.error(`恢复 ${table} 时出错:`, err);
+        }
+        return;
+      }
+      rows.forEach(row => {
+        db.run(updates[table], [row.count, row.cat_id]);
+      });
+      console.log(`${table} 恢复完成`);
     });
-    console.log('Daily companions restored');
   });
 }
 
