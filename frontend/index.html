@@ -123,31 +123,38 @@
                 const table = document.createElement('table');
                 table.innerHTML = `
                     <tr>
-                        <th>编号</th>
                         <th>名字</th>
                         <th>具体位置</th>
                         <th>今日投喂次数</th>
                         <th>今日陪伴次数</th>
                         <th>投喂？</th>
                         <th>陪伴？</th>
+                        <th>云撸猫</th>
+                        <th>想它？</th>
+                        <th>编号</th>
                     </tr>
                 `;
 
                 area.cats.forEach(cat => {
                     const row = table.insertRow();
-                    row.insertCell(0).textContent = cat.cat_id;
-                    row.insertCell(1).textContent = cat.name;
-                    row.insertCell(2).textContent = cat.specific_location;
-                    row.insertCell(3).textContent = cat.count;
-                    row.insertCell(4).textContent = cat.companion_count;
+                    row.insertCell(0).textContent = cat.name;
+                    row.insertCell(1).textContent = cat.specific_location;
+                    row.insertCell(2).textContent = cat.count;
+                    row.insertCell(3).textContent = cat.companion_count;
                     const feedButton = document.createElement("button");
                     feedButton.textContent = "投喂";
                     feedButton.onclick = () => toggleFed(cat.cat_id);
-                    row.insertCell(5).appendChild(feedButton);
+                    row.insertCell(4).appendChild(feedButton);
                     const companionButton = document.createElement("button");
                     companionButton.textContent = "陪伴";
                     companionButton.onclick = () => toggleCompanion(cat.cat_id);
-                    row.insertCell(6).appendChild(companionButton);
+                    row.insertCell(5).appendChild(companionButton);
+                    row.insertCell(6).textContent = cat.miss_count;
+                    const missButton = document.createElement("button");
+                    missButton.textContent = "想它";
+                    missButton.onclick = () => toggleMiss(cat.cat_id);
+                    row.insertCell(7).appendChild(missButton);
+                    row.insertCell(8).textContent = cat.cat_id;
                 });
 
                 catTable.appendChild(table);
@@ -166,7 +173,7 @@
             "你喂的猫咪吃得非常开心，感谢你对它的关照。🍖🥰",
             "猫咪肚子圆滚滚的，它特别感激你的投喂！🐈🍗",
             "谢谢你让猫咪今天吃到了好吃的，它一定很开心。😻🍲",
-            "你让猫咪的世界又温暖了一些，谢谢你的喂食！🌞🐾",
+            "你让猫咪的世界又温暖了一些，谢谢你！🌞🐾",
             "猫咪已经满足地吃饱了，它感激你。😺🙏",
             "你的一份投喂让猫咪多了一份欢快，感谢你！🎈🐾",
             "感谢你的一份食物，猫咪吃得心满意足。🍽️😺",
@@ -211,6 +218,29 @@
             "你让猫咪的日子不再孤独，真是太感谢了！🐾❤️",
         ];
 
+        const missMessages = [
+            "猫咪已经感受到你的思念，它的耳朵动了动，好像在回应你呢！🐱💓",
+            "小猫咪收到了你的思念，它打了个哈欠，闭上眼睛感受着你的爱。😻💭",
+            "你的思念像一阵暖风，轻轻抚过猫咪，它一定感受到了你深深的挂念。🍃🐾",
+            "猫咪偷偷告诉我，它感受到了你的思念，心里暖暖的。🐱💖",
+            "远方的思念悄悄飘到了猫咪身边，它已经舒服地卷起尾巴了呢！😽💫",
+            "猫咪懒洋洋地躺着，好像在等你的思念飞到它身边。🐾🌙",
+            "你的思念让猫咪忍不住眯起了眼睛，它知道你一直惦记着它。😻💞",
+            "猫咪收到了你的思念，轻轻打了个呼噜，表示它感受到了这份温暖。🐱💌",
+            "你的思念像阳光一样洒在猫咪身上，它的心里也充满了暖意。🌞🐾",
+            "猫咪感受到了你的思念，它的眼睛闪闪发亮，仿佛在等待与你的重逢。😺✨",
+            "你悄悄的思念穿过空气来到猫咪身边，它的耳朵动了动，心里充满了欢喜。🐾💖",
+            "猫咪已经感觉到你的思念，尾巴轻轻摆动着，像是在回应你。🐱💫",
+            "你默默的思念，像轻轻的抚摸，让猫咪安心地躺下休息。💭😽",
+            "猫咪的心里充满了你的思念，它偷偷露出了一个小小的微笑。😻💖",
+            "你的思念已经到达，猫咪悄悄转过身，仿佛在偷偷感受你的关怀。🐱💭",
+            "猫咪闻到了你思念的气息，缓缓伸了个懒腰，它感到无比满足。🐾🌸",
+            "你温柔的思念像是猫咪最喜欢的玩具，让它愉快地轻轻摇摆尾巴。🐱🎾",
+            "猫咪收到了你的思念，它甜甜地打了个呼噜，表示它很开心。😺💞",
+            "你对猫咪的思念，仿佛让它的胡须轻轻颤动，它一定感受到了你的关爱。🐾💖",
+            "猫咪在阳光下眯着眼睛，仿佛能感受到你远方传来的温暖思念。🐱🌞"
+        ];
+
         function showRandomMessage(messages) {
             const randomIndex = Math.floor(Math.random() * messages.length);
             alert(messages[randomIndex]);
@@ -239,6 +269,19 @@
                 await updateTable();
             } else {
                 alert('猫咪今天已经得到了你的陪伴，它很开心哦！😻💖');
+            }
+        }
+
+        async function toggleMiss(catId) {
+            const response = await fetch(`${API_URL}/miss/${catId}`, { method: 'POST' });
+            const result = await response.json();
+            if (result.success) {
+                if (result.firstTime) {
+                    showRandomMessage(missMessages);
+                }
+                await updateTable();
+            } else {
+                alert(result.message);
             }
         }
 

@@ -42,6 +42,7 @@ db.run(`CREATE TABLE IF NOT EXISTS cats (
   specific_location TEXT,
   count INTEGER,
   companion_count INTEGER DEFAULT 0,
+  miss_count INTEGER DEFAULT 0,
   FOREIGN KEY (area_id) REFERENCES areas(id)
 )`);
 
@@ -87,7 +88,26 @@ db.run(`CREATE TABLE IF NOT EXISTS feeding_history (
   cat_id TEXT,
   feed_date DATE,
   feed_count INTEGER,
-  companion_count INTEGER
+  companion_count INTEGER,
+  miss_count INTEGER
+)`);
+
+// 创建用户思念记录表
+db.run(`CREATE TABLE IF NOT EXISTS misses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cat_id TEXT,
+  user_ip TEXT,
+  miss_date DATE,
+  UNIQUE(cat_id, user_ip, miss_date)
+)`);
+
+// 创建每日思念记录表
+db.run(`CREATE TABLE IF NOT EXISTS daily_misses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cat_id TEXT,
+  miss_date DATE,
+  count INTEGER,
+  UNIQUE(cat_id, miss_date)
 )`);
 
 // 初始化区域数据
@@ -115,15 +135,16 @@ function initializeCats() {
   db.serialize(() => {
     // 准备插入或更新的语句
     const stmt = db.prepare(`
-      INSERT OR REPLACE INTO cats (cat_id, name, area_id, specific_location, count, companion_count) 
+      INSERT OR REPLACE INTO cats (cat_id, name, area_id, specific_location, count, companion_count, miss_count) 
       VALUES (?, ?, (SELECT id FROM areas WHERE name = ?), ?, 
         COALESCE((SELECT count FROM cats WHERE cat_id = ?), 0), 
-        COALESCE((SELECT companion_count FROM cats WHERE cat_id = ?), 0)
+        COALESCE((SELECT companion_count FROM cats WHERE cat_id = ?), 0), 
+        COALESCE((SELECT miss_count FROM cats WHERE cat_id = ?), 0)
       )
     `);
 
     cats.forEach(cat => {
-      stmt.run(cat.cat_id, cat.name, cat.area, cat.specific_location, cat.cat_id, cat.cat_id, (err) => {
+      stmt.run(cat.cat_id, cat.name, cat.area, cat.specific_location, cat.cat_id, cat.cat_id, cat.cat_id, (err) => {
         if (err) {
           console.error(`Error inserting or updating cat ${cat.cat_id}:`, err);
         }
@@ -151,6 +172,7 @@ function createTables() {
       specific_location TEXT,
       count INTEGER,
       companion_count INTEGER DEFAULT 0,
+      miss_count INTEGER DEFAULT 0,
       FOREIGN KEY (area_id) REFERENCES areas(id)
     )`);
     db.run(`CREATE TABLE IF NOT EXISTS daily_feedings (
@@ -186,7 +208,22 @@ function createTables() {
       cat_id TEXT,
       feed_date DATE,
       feed_count INTEGER,
-      companion_count INTEGER
+      companion_count INTEGER,
+      miss_count INTEGER
+    )`);
+    db.run(`CREATE TABLE IF NOT EXISTS misses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cat_id TEXT,
+      user_ip TEXT,
+      miss_date DATE,
+      UNIQUE(cat_id, user_ip, miss_date)
+    )`);
+    db.run(`CREATE TABLE IF NOT EXISTS daily_misses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cat_id TEXT,
+      miss_date DATE,
+      count INTEGER,
+      UNIQUE(cat_id, miss_date)
     )`);
   });
 }
@@ -208,10 +245,10 @@ updateCatsInfo();
 function updateCatsInfo() {
   const cats = require('./cats_data');
 
-  const stmt = db.prepare('INSERT OR REPLACE INTO cats (cat_id, name, area_id, specific_location, count, companion_count) VALUES (?, ?, (SELECT id FROM areas WHERE name = ?), ?, COALESCE((SELECT count FROM cats WHERE cat_id = ?), 0), COALESCE((SELECT companion_count FROM cats WHERE cat_id = ?), 0))');
+  const stmt = db.prepare('INSERT OR REPLACE INTO cats (cat_id, name, area_id, specific_location, count, companion_count, miss_count) VALUES (?, ?, (SELECT id FROM areas WHERE name = ?), ?, COALESCE((SELECT count FROM cats WHERE cat_id = ?), 0), COALESCE((SELECT companion_count FROM cats WHERE cat_id = ?), 0), COALESCE((SELECT miss_count FROM cats WHERE cat_id = ?), 0))');
   
   cats.forEach(cat => {
-    stmt.run(cat.cat_id, cat.name, cat.area, cat.specific_location, cat.cat_id, cat.cat_id, (err) => {
+    stmt.run(cat.cat_id, cat.name, cat.area, cat.specific_location, cat.cat_id, cat.cat_id, cat.cat_id, (err) => {
       if (err) {
         console.error(`Error updating cat ${cat.cat_id}:`, err);
       }
@@ -331,12 +368,12 @@ function resetDailyCounts() {
   const yesterday = new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split('T')[0];
 
   // 将昨天的数据存入历史记录表
-  db.run(`INSERT INTO feeding_history (cat_id, feed_date, feed_count, companion_count)
-          SELECT cat_id, ?, count, companion_count
+  db.run(`INSERT INTO feeding_history (cat_id, feed_date, feed_count, companion_count, miss_count)
+          SELECT cat_id, ?, count, companion_count, miss_count
           FROM cats`, [yesterday]);
 
   // 重置cats表中的计数
-  db.run('UPDATE cats SET count = 0, companion_count = 0', (err) => {
+  db.run('UPDATE cats SET count = 0, companion_count = 0, miss_count = 0', (err) => {
     if (err) {
       console.error('Error resetting daily counts:', err);
     } else {
@@ -347,6 +384,7 @@ function resetDailyCounts() {
   // 清理旧的用户记录
   db.run('DELETE FROM feedings WHERE fed_date < ?', [today]);
   db.run('DELETE FROM companions WHERE companion_date < ?', [today]);
+  db.run('DELETE FROM misses WHERE miss_date < ?', [today]);
 }
 
 // 设置每日午夜重置
@@ -432,5 +470,47 @@ app.get('/history/:cat_id', (req, res) => {
       return;
     }
     res.json(rows);
+  });
+});
+
+// 新增路由: 处理思念操作
+app.post('/miss/:cat_id', (req, res) => {
+  const { cat_id } = req.params;
+  const userIp = getClientIp(req);
+  const today = new Date().toISOString().split('T')[0];
+
+  db.get('SELECT * FROM misses WHERE cat_id = ? AND user_ip = ? AND miss_date = ?', [cat_id, userIp, today], (err, row) => {
+    if (err) {
+      res.status(500).json({ success: false, message: err.message });
+      return;
+    }
+
+    if (row) {
+      res.json({ success: false, message: '知道你非常想它啦，有空了带着粮快去找它！❤️' });
+      return;
+    }
+
+    db.run('INSERT INTO misses (cat_id, user_ip, miss_date) VALUES (?, ?, ?)', [cat_id, userIp, today], (err) => {
+      if (err) {
+        res.status(500).json({ success: false, message: err.message });
+        return;
+      }
+
+      db.run('UPDATE cats SET miss_count = miss_count + 1 WHERE cat_id = ?', [cat_id], (err) => {
+        if (err) {
+          res.status(500).json({ success: false, message: err.message });
+          return;
+        }
+
+        db.run('INSERT OR REPLACE INTO daily_misses (cat_id, miss_date, count) VALUES (?, ?, COALESCE((SELECT count FROM daily_misses WHERE cat_id = ? AND miss_date = ?), 0) + 1)', 
+          [cat_id, today, cat_id, today], (err) => {
+          if (err) {
+            res.status(500).json({ success: false, message: err.message });
+            return;
+          }
+          res.json({ success: true, firstTime: true });
+        });
+      });
+    });
   });
 });
