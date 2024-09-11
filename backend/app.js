@@ -385,6 +385,11 @@ function resetDailyCounts() {
   db.run('DELETE FROM feedings WHERE fed_date < ?', [today]);
   db.run('DELETE FROM companions WHERE companion_date < ?', [today]);
   db.run('DELETE FROM misses WHERE miss_date < ?', [today]);
+
+  // 清理旧的每日记录
+  db.run('DELETE FROM daily_feedings WHERE feed_date < ?', [today]);
+  db.run('DELETE FROM daily_companions WHERE companion_date < ?', [today]);
+  db.run('DELETE FROM daily_misses WHERE miss_date < ?', [today]);
 }
 
 // 设置每日午夜重置
