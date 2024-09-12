@@ -393,14 +393,19 @@ function resetDailyCounts() {
 }
 
 // 设置每日午夜重置
-const resetTime = new Date();
-resetTime.setHours(24, 0, 0, 0);
-const msUntilMidnight = resetTime - new Date();
+function scheduleReset() {
+  const now = new Date();
+  const night = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
+  const msToMidnight = night.getTime() - now.getTime();
 
-setTimeout(() => {
-  resetDailyCounts();
-  setInterval(resetDailyCounts, 24 * 60 * 60 * 1000);
-}, msUntilMidnight);
+  setTimeout(() => {
+    resetDailyCounts();
+    scheduleReset(); // 重新调度下一天的重置
+  }, msToMidnight);
+}
+
+// 启动定时重置任务
+scheduleReset();
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/index.html'));
