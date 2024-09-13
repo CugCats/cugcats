@@ -34,7 +34,7 @@
     <h2>使用说明</h2>
     <p>这个网站旨在记录未来城校区猫咪的喂食情况，帮助避免猫咪被过度投喂 🐾。你可以通过下方的"测试用"按钮进行喂食功能的测试 🐱🍲。</p>
     <p>如果你今天已经喂过某只猫咪，请在网站上找到相应的猫咪并点击"投喂"按钮 🐾。这样其他人就可以看到这只猫咪今天被喂了多少次，从而决定是否继续喂食或陪伴它 🐾💬。</p>
-    <p>本网站的猫咪编号来自于<a href="https://docs.qq.com/sheet/DWXVLaUVPb1ZNdmlr?tab=fliaid">这个表格</a>，里面附有猫咪的照片 📸。未来，我会努力将这些照片直接显示在网站上，方便大家查阅 🖼️。</p>
+    <p>本网站的猫咪编号来自于<a href="https://docs.qq.com/sheet/DWXVLaUVPb1ZNdmlr?tab=fliaid">这个表格</a>，里面附有猫咪的照片 📸。</p>
 
     <p>为了防止误操作导致猫咪被反复投喂 🐾，网站会根据访问者的 IP 地址来判断是否为独立的喂食行为。你的 IP 只用于此目的，不会被用作其他用途 🔒。如果你使用的是 CUG 的校园 Wi-Fi 📶，可能会提示你已经喂过猫咪。此时建议切换到手机流量后再试 📱。</p>
     <p>🪧 欢迎加入 QQ 群：468204487 和大家一起交流。🎉</p>
@@ -46,6 +46,7 @@
     
     <h2>其他信息</h2>
     <p>如果需要补充猫咪的信息，你可以联系微信：cugcats</p>
+    <p>最后一列的数据 HAC 代表 historical attention counts，历史上的被关注次数，这个「历史」目前暂时不包括今天， </p>
     <p>由于这个网站还在不断完善，所以不排除未来会不定时的无法访问，或者数据丢失，不用担心，它未来会越来越稳定的。</p>
     <p>项目已开源，点击<a href="https://github.com/CugCats/cugcats">这里</a>查看</p>
 
@@ -125,15 +126,24 @@
                     <tr>
                         <th>名字</th>
                         <th>具体位置</th>
-                        <th>今日投喂次数</th>
-                        <th>今日陪伴次数</th>
+                        <th>投喂次数</th>
+                        <th>陪伴次数</th>
                         <th>投喂？</th>
                         <th>陪伴？</th>
                         <th>云撸猫</th>
                         <th>想它？</th>
                         <th>编号</th>
+                        <th>HAC</th>
                     </tr>
                 `;
+
+                const historicalAttentionCounts = await getHistoricalAttentionCounts();
+
+                area.cats.sort((a, b) => {
+                    const aCount = historicalAttentionCounts[a.cat_id] || 0;
+                    const bCount = historicalAttentionCounts[b.cat_id] || 0;
+                    return bCount - aCount;
+                });
 
                 area.cats.forEach(cat => {
                     const row = table.insertRow();
@@ -155,6 +165,7 @@
                     missButton.onclick = () => toggleMiss(cat.cat_id);
                     row.insertCell(7).appendChild(missButton);
                     row.insertCell(8).textContent = cat.cat_id;
+                    row.insertCell(9).textContent = historicalAttentionCounts[cat.cat_id] || 0;
                 });
 
                 catTable.appendChild(table);
@@ -237,8 +248,8 @@
             "猫咪闻到了你思念的气息，缓缓伸了个懒腰，它感到无比满足。🐾🌸",
             "你温柔的思念像是猫咪最喜欢的玩具，让它愉快地轻轻摇摆尾巴。🐱🎾",
             "猫咪收到了你的思念，它甜甜地打了个呼噜，表示它很开心。😺💞",
-            "你对猫咪的思念，仿佛让它的胡须轻轻颤动，它一定感受到了你的关爱。🐾💖",
-            "猫咪在阳光下眯着眼睛，仿佛能感受到你远方传来的温暖思念。🐱🌞"
+            "你让猫咪今天和你度过了愉快的时光，它一定很开心。🐱🎉",
+            "你让猫咪的日子不再孤独，真是太感谢了！🐾❤️",
         ];
 
         function showRandomMessage(messages) {
@@ -282,6 +293,22 @@
                 await updateTable();
             } else {
                 alert(result.message);
+            }
+        }
+
+        async function getHistoricalAttentionCounts() {
+            try {
+                const response = await fetch(`${API_URL}/historical-attention-counts`);
+                const data = await response.text();
+                const counts = {};
+                data.split('\n').forEach(line => {
+                    const [catId, count] = line.split(' | ');
+                    counts[catId] = count;
+                });
+                return counts;
+            } catch (error) {
+                console.error('Error fetching historical attention counts:', error);
+                return {};
             }
         }
 

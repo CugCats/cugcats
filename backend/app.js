@@ -73,7 +73,7 @@ db.run(`CREATE TABLE IF NOT EXISTS companions (
   UNIQUE(cat_id, user_ip, companion_date)
 )`);
 
-// 创建每日陪伴记录表
+// 创建每日伴记录表
 db.run(`CREATE TABLE IF NOT EXISTS daily_companions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   cat_id TEXT,
@@ -400,6 +400,7 @@ function scheduleReset() {
 
   setTimeout(() => {
     resetDailyCounts();
+    generateHistoricalAttentionCounts();
     scheduleReset(); // 重新调度下一天的重置
   }, msToMidnight);
 }
@@ -523,4 +524,31 @@ app.post('/miss/:cat_id', (req, res) => {
       });
     });
   });
+});
+
+function generateHistoricalAttentionCounts() {
+  db.all(`
+    SELECT 
+      cat_id,
+      SUM(feed_count) + SUM(companion_count) + SUM(miss_count) AS total_attention
+    FROM feeding_history
+    WHERE feed_date < date('now')
+    GROUP BY cat_id
+  `, (err, rows) => {
+    if (err) {
+      console.error('Error generating historical attention counts:', err);
+      return;
+    }
+
+    const fs = require('fs');
+    const outputPath = path.join(__dirname, '../database/historical_attention_counts.txt');
+    const outputLines = rows.map(row => `${row.cat_id} | ${row.total_attention}`);
+    fs.writeFileSync(outputPath, outputLines.join('\n'));
+    console.log('Historical attention counts generated successfully');
+  });
+}
+
+app.get('/historical-attention-counts', (req, res) => {
+  const filePath = path.join(__dirname, '../database/historical_attention_counts.txt');
+  res.sendFile(filePath);
 });
