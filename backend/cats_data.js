@@ -41,6 +41,8 @@ const cats = [
   { cat_id: 'CAT092', name: '丑橘', area: '宿舍区', specific_location: '四组团' },
   { cat_id: 'CAT093', name: '半白半菊', area: '宿舍区', specific_location: '四组团' },
   { cat_id: 'CAT094', name: '雪里拖枪', area: '宿舍区', specific_location: '未知' },
+  { cat_id: 'CAT095', name: '袖套', area: '宿舍区', specific_location: '四组团' },
+  { cat_id: 'CAT096', name: '领结猫', area: '宿舍区', specific_location: '图书馆、一组团' },
   
   // ... 其他猫咪数据 ...
 ];
