@@ -130,10 +130,9 @@ function initializeAreas() {
 
 // 初始化猫咪数据
 function initializeCats() {
-  const cats = require('./cats_data');
+  const cats = require('./cats_data').filter(cat => !cat.cat_id.startsWith('//'));
 
   db.serialize(() => {
-    // 准备插入或更新的语句
     const stmt = db.prepare(`
       INSERT OR REPLACE INTO cats (cat_id, name, area_id, specific_location, count, companion_count, miss_count) 
       VALUES (?, ?, (SELECT id FROM areas WHERE name = ?), ?, 
@@ -241,9 +240,10 @@ console.log('数据库结构检查完成');
 
 // 更新猫咪信息
 updateCatsInfo();
+cleanupCats();
 
 function updateCatsInfo() {
-  const cats = require('./cats_data');
+  const cats = require('./cats_data').filter(cat => !cat.cat_id.startsWith('//'));
 
   const stmt = db.prepare('INSERT OR REPLACE INTO cats (cat_id, name, area_id, specific_location, count, companion_count, miss_count) VALUES (?, ?, (SELECT id FROM areas WHERE name = ?), ?, COALESCE((SELECT count FROM cats WHERE cat_id = ?), 0), COALESCE((SELECT companion_count FROM cats WHERE cat_id = ?), 0), COALESCE((SELECT miss_count FROM cats WHERE cat_id = ?), 0))');
   
@@ -260,6 +260,19 @@ function updateCatsInfo() {
       console.error('Error finalizing statement:', err);
     } else {
       console.log('猫咪信息更新完成');
+    }
+  });
+}
+
+function cleanupCats() {
+  const cats = require('./cats_data').filter(cat => !cat.cat_id.startsWith('//'));
+  const catIds = cats.map(cat => cat.cat_id);
+
+  db.run('DELETE FROM cats WHERE cat_id NOT IN (' + catIds.map(() => '?').join(',') + ')', catIds, (err) => {
+    if (err) {
+      console.error('Error cleaning up cats:', err);
+    } else {
+      console.log('猫咪数据清理完成');
     }
   });
 }
