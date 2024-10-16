@@ -377,8 +377,9 @@ app.post('/feed/:cat_id', (req, res) => {
 
 // 每日重置喂食和陪伴计数的函数
 function resetDailyCounts() {
-  const today = new Date().toISOString().split('T')[0];
-  const yesterday = new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split('T')[0];
+  const utc8Now = getUTC8Date();
+  const today = utc8Now.toISOString().split('T')[0];
+  const yesterday = new Date(utc8Now.setDate(utc8Now.getDate() - 1)).toISOString().split('T')[0];
 
   // 将昨天的数据存入历史记录表
   db.run(`INSERT INTO feeding_history (cat_id, feed_date, feed_count, companion_count, miss_count)
@@ -408,8 +409,15 @@ function resetDailyCounts() {
 // 设置每日午夜重置
 function scheduleReset() {
   const now = new Date();
-  const night = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
-  const msToMidnight = night.getTime() - now.getTime();
+  const utc8Offset = 8 * 60 * 60 * 1000; // UTC+8 偏移量（毫秒）
+  const utc8Now = new Date(now.getTime() + utc8Offset);
+  const utc8Night = new Date(
+    utc8Now.getFullYear(),
+    utc8Now.getMonth(),
+    utc8Now.getDate() + 1,
+    0, 0, 0
+  );
+  const msToMidnight = utc8Night.getTime() - utc8Now.getTime();
 
   setTimeout(() => {
     resetDailyCounts();
@@ -565,3 +573,9 @@ app.get('/historical-attention-counts', (req, res) => {
   const filePath = path.join(__dirname, '../database/historical_attention_counts.txt');
   res.sendFile(filePath);
 });
+
+function getUTC8Date() {
+  const now = new Date();
+  const utc8Offset = 8 * 60 * 60 * 1000;
+  return new Date(now.getTime() + utc8Offset);
+}
